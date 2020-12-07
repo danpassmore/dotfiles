@@ -1,0 +1,446 @@
+# get 256 color 
+# if colors don't look right, run this command to get valid settings for the machine:
+#                       find /lib/terminfo /usr/share/terminfo -name "*256*"
+# (as shown here https://push.cx/2008/256-color-xterms-in-ubuntu)
+export TERM=tmux-256color
+
+alias   builds='if [ -d /local/mnt/workspace/$USER/Builds ];then cd /local/mnt/workspace/$USER/Builds; elif [ -d /local/mnt/workspace/rci ];then cd /local/mnt/workspace/rci; else echo "Builds folder not available"; fi'
+alias   codeblocks='/usr/bin/codeblocks 2>&1 >/dev/null'
+alias   findbuild=/prj/qct/asw/qctss/linux/bin/FindBuild
+alias   igrep='grep -i'
+alias   less='less -r'
+alias   ls='ls --color'
+alias   ll='ls -ltr'
+alias   md='mkdir -p'
+alias   notepad++='scite'
+alias   qclient='/pkg/qct/software/perl/bin/perl /prj/qct/mcs/share/bin/qclient.pl'
+alias   rd='rmdir'
+alias   vce='python /prj/qct/asw/qctss/linux/bin/vce/vce.py'
+alias   vi='nvim'
+
+# Mapped network paths
+alias   jenkins='cd /prj/qct/rfvi/scratch1/Builds/Jenkins'
+alias   qblt='cd /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB'
+alias   sdrive='cd /prj/qct/asw/modem_sw_rfa/suiteserver'
+
+# Extras
+alias qbuild='QBuild'
+
+# Perforce settings
+export P4PORT=ssl:qctp401:1443
+export P4DIFF='nvim -d'
+export P4CONFIG=.p4config
+
+
+###############################################################################################
+# adds charater string representing a folder to the system $PATH variable
+# sample usage: try-insert-to-path ~/bin
+try-insert-to-path()
+{
+  if [ -d "$1" ]; then
+    if [[ ":$PATH:" == *":$1:"* ]]; then
+      echo "already in path:     $1"
+    else
+      PATH="$PATH:$1"
+      echo "newly added to path: $1"
+    fi
+  else
+    echo "doesn't exist:       $1"
+  fi
+}
+###############################################################################################
+
+###############################################################################################
+# adjustments to $PATH
+###############################################################################################
+
+USR_BIN="${HOME}/bin"
+NVIM_BIN="${HOME}/bin/nvim-linux64/bin" 
+CARGO_BIN="${HOME}/.cargo/bin" 
+LINUX_SCRIPTS_BIN="${HOME}/bin/LinuxScripts" 
+LLVM_BIN="${HOME}/bin/llvm/bin"
+FZF_BIN="${HOME}/.fzf/bin"
+P4_BIN="/pkg/qct/software/perforce/bin"
+QCT_BIN="/pkg/qct/qctss/linux/bin"
+TMUX_BIN="${HOME}/bin/tmux-3.2/bin"
+
+# doesn't work in zsh but does in bash :(
+# try looking at https://stackoverflow.com/questions/11655770/looping-through-the-elements-of-a-path-variable-in-bash
+
+#COMBINED="$USR_BIN $CARGO_BIN $LINUX_SCRIPTS_BIN $LLVM_BIN $P4_BIN"
+#for ENTRY in $( echo "$COMBINED" ) 
+#do
+#  echo "$ENTRY"
+#  try-insert-to-path $ENTRY
+#done
+
+try-insert-to-path $NVIM_BIN
+try-insert-to-path $CARGO_BIN
+try-insert-to-path $LINUX_SCRIPTS_BIN
+try-insert-to-path $LLVM_BIN
+try-insert-to-path $FZF_BIN
+try-insert-to-path $TMUX_BIN
+try-insert-to-path $USR_BIN
+
+# P4_BIN must be before QCT_BIN since QCT_BIN contains an old (undesirable) version of p4
+try-insert-to-path $P4_BIN 
+try-insert-to-path $QCT_BIN
+
+
+###############################################################################################
+
+IBM=~/bin/ibm/ibm.sh
+
+alias ibm="$IBM"
+
+CRM_BUILD_SCRIPT=modem_proc/build/ms/build.sh
+BUILD_CLIENT_SCRIPT=modem_proc/build/ms/build_client.py 
+
+get_abs_filename() {
+  # $1 : relative filename
+  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")";
+}
+
+###############################################################################################
+# creates a compilation database in the current directory by copying it from another existing file and replacing paths.
+# (Should be run from the build root directory).
+#
+# sample usage(s): 
+#  cdb-copy-from ../../add_bands/BF-ENG-n14-MPSS.HI.1.0-02890-SDX55_MNRMTEFS_TEST-1/compile_commands.json
+#  cdb-copy-from
+#  /local/mnt/workspace/dpassmor/Builds/hi/rci/add_bands/BF-ENG-n14-MPSS.HI.1.0-02890-SDX55_MNRMTEFS_TEST-1/compile_commands.json
+cdb-copy-from()
+{
+  # get input as an absolute path
+  abspath=$(echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")");
+
+  if [ ! -w "$abspath" ]; then
+    echo "input path doesn't appear to be a real path, or can't get valid absolute path:" 1>&2;
+    echo "$abspath" 1>&2;
+    return 1;
+  fi
+
+  # get base path and escaped version of base path
+  dirpath="$(dirname $abspath)";
+  dirpathesc=$(echo $dirpath | sed 's_/_\\/_g');
+
+  # get pwd and escaped version of pwd
+  pwd=$(echo $PWD);
+  pwdesc=$(echo $PWD | sed 's_/_\\/_g');
+
+  # determine the exact sed expression
+  sedexpr="s/$dirpathesc/$pwdesc/g";
+
+  # perform the copy and do the path-replacement
+  cp -i $abspath $pwd;
+  if [ $? -eq 0 ]; then
+    echo "cp returned error. Won't generate compile_commands.json." 1>&2;
+    return 2;
+  fi
+  sed -i $sedexpr compile_commands.json;
+}
+
+###############################################################################################
+# Modifies a compilation database such that asserts don't show errors
+# sample usage: cdb-fix-hexagon
+cdb-fix-hexagon()
+{
+  if [ -w compile_commands.json ]; then
+    sed -i 's/DASSERT=ASSERT_FATAL/DASSERT(x)=if(x){((void)0);}\", \"-Wno-error=strict-prototypes/g;s/-mv\([0-9]*\)/-mv\1\", \"-D__HEXAGON_ARCH__=\1/g;s/-fenable-pt-opts//g;s/-fpartition-cold//g;s/-fdisable-sp-updates//g;s/-fwarning-compat=high//g;s/-fsize-opts//g' compile_commands.json;
+  fi
+}
+###############################################################################################
+# (use this for post-processing a compilation database that has been processed with compdb)
+# Modifies a compilation database such that asserts don't show errors 
+# sample usage: cdb-fix-hexagon
+cdb-w-compdb-fix-hexagon()
+{
+  if [ -w compile_commands.json ]; then
+    sed -i 's/DASSERT=ASSERT_FATAL/DASSERT(x)=if(x){((void)0);} -Wno-error=strict-prototypes/g;s/-mv\([0-9]*\)/-mv\1 -D__HEXAGON_ARCH__=\1/g' compile_commands.json;
+  fi
+}
+
+###############################################################################################
+# undoes cdb-fix-hexagon
+# sample usage: cdb-fix-hexagon-undo
+cdb-fix-hexagon-undo()
+{
+  if [ -w compile_commands.json ]; then
+    sed -i 's/DASSERT(x)=if(x){((void)0);}\", \"-Wno-error=strict-prototypes/DASSERT=ASSERT_FATAL/g;s/-mv\([0-9]*\)", \"-D__HEXAGON_ARCH__=\([0-9]*\)/-mv\1/g' compile_commands.json;
+  fi
+}
+
+###############################################################################################
+# undoes cdb-fix-hexagon
+# sample usage: cdb-fix-hexagon-undo
+cdb-w-compdb-fix-hexagon-undo()
+{
+  if [ -w compile_commands.json ]; then
+    sed -i 's/DASSERT(x)=if(x){((void)0);}\",\n\"-Wno-error=strict-prototypes/DASSERT=ASSERT_FATAL/g;s/-mv\([0-9]*\) -D__HEXAGON_ARCH__=\([0-9]*\)/-mv\1/g' compile_commands.json;
+  fi
+}
+
+###############################################################################################
+# creates a compilation database from some pre-set components (useful for tooling)
+# NOTE: base-set of modules to include are specified in the script below, so no extra filter command is needed
+#
+# sample usage: cdb-create sdx55.rmtefs.test
+cdb-create()
+{
+  if [ -x "$(command -v bear)" ]; then
+    #FILTER=utils,rf/rftech_nr5g_r,rf/rfa/rf,rf/rflm_r;
+    FILTER=utils,rf/rftech_nr5g_r,rf/rfa/rf,rf/rflm_r,rf/rfdevice_interface;
+    #FILTER=utils,rf;
+
+    # force rebuild with bear listening
+    #bear $CRM_BUILD_SCRIPT -k --force-build --filter=$FILTER $*;
+    bear $BUILD_CLIENT_SCRIPT bparams="-k --force-build --filter=$FILTER" $*;
+
+    # optionally add header file entries to compilation db using "compdb" program
+    if true && [ -x "$(command -v compdb)" ]; then
+      tempfile=$(mktemp);
+      compdb list > $tempfile;
+      cp $tempfile compile_commands.json;
+      rm $tempfile;
+    fi
+
+    # optionally modify entries to work better with code to be compiled with hexagon
+    if true; then
+      $(cdb-fix-hexagon)
+    fi
+  else
+    echo "bear executable not found.  Make sure "bear" is in your PATH."
+  fi
+}
+
+###############################################################################################
+# Appends modules to a compilation database (creates file if it doesn't exist)
+# NOTE: must specify filtered components to add (or else everything will be added, which usually runs out of memory)
+#
+# sample usage: cdb-add sdx55.rmtefs.test --filter=rf/rftech_lte
+cdb-add()
+{
+  if [ -x "$(command -v bear)" ]; then
+    # force rebuild with bear listening
+    #bear --append $CRM_BUILD_SCRIPT -k --force-build $*;
+    bear $BUILD_CLIENT_SCRIPT -k bparams="--force-build --filter=$FILTER" $*;
+    if [ -x "$(command -v compdb)" ]; then
+      tempfile=$(mktemp)
+      compdb list > $tempfile
+      cp $tempfile compile_commands.json
+      rm $tempfile
+    fi
+  fi
+}
+
+###############################################################################################
+# language-server index the build
+#
+# sample usage: cdb-add sdx55.rmtefs.test --filter=rf/rftech_lte
+ccls-index()
+{
+  ccls -index=.
+}
+
+###############################################################################################
+# runs doxygen on the build (run from root directory of build)
+# usage: doxy
+doxy()
+{
+  STARTTIME=$(date +%s);
+  echo "Running Doxygen.  Please wait...";
+  cd modem_proc/rftech_nr5g/etc/doc;
+  /pkg/qct/software/doxygen/1.8.8/bin/doxygen rf_nr5g_doxygen 2>/dev/null 1>/dev/null;
+  cd ../../../..;
+  echo "--------------------------------------------------";
+  echo "--------- RF TECH NR5G Doxygen Warnings ----------";
+  echo "--------------------------------------------------";
+  totalw=$(grep -c -e "modem_proc/rflm/rftech/nr5g/.*warning:" -e "modem_proc/rflm/api/nr5g/.*warning:" -e "modem_proc/rftech_nr5g/.*warning:" modem_proc/rftech_nr5g/etc/doc/rf_nr5g_doxygen_warning.log);
+  echo "Total Warnings: ${totalw}"
+  grep --color=auto -e "modem_proc/rflm/rftech/nr5g/.*warning:" -e "modem_proc/rflm/api/nr5g/.*warning:" -e "modem_proc/rftech_nr5g/.*warning:" modem_proc/rftech_nr5g/etc/doc/rf_nr5g_doxygen_warning.log;
+  echo "--------------------------------------------------";
+  hostn=$(hostname);
+  cdir=$(echo ${pwd} | perl -pe 's/\/local\/mnt//g');
+  echo "Doxygen Link: file://${hostn}${cdir}/modem_proc/rftech_nr5g/etc/doc/output/html/index.html";
+  ENDTIME=$(date +%s);
+  echo "Time elapsed: $(($ENDTIME - $STARTTIME)) seconds";
+}
+
+###############################################################################################
+# if fuzzyfind is installed with vim plugin, setup an alias for it
+if [ -f "~/.fzf/bin/fzf" ]; then
+  alias fzf='~/.fzf/bin/fzf'
+fi
+
+###############################################################################################
+# if fzf works, set up the default command
+if [ -x "fzf" ]; then
+  # --files: List files that would be searched but do not search
+  # --no-ignore: Do not respect .gitignore, etc...
+  # --hidden: Search hidden files and folders
+  # --follow: Follow symlinks
+  # --glob: Additional conditions for search (in this case ignore everything in the .git/ folder)
+  export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow --glob "!.git/*"'
+fi
+
+###############################################################################################
+# adds a specified CL to code collaborator, adds the rftech_nr5g group as a reviewer, and 
+# begins the annotation phase of the review.
+# usage: ccstart5g <p4 cl numbers> <review id> <reviewers list>
+alias ccnew5g='/usr2/bhaskarn/bin/5gtechcode.sh'
+
+###############################################################################################
+# run from the root directory of a build, it will prepare a build for development (e.g. tag build, etc) 
+# usage: devprep
+alias devprep='python ~/scripts/syncbuild.py'
+
+###############################################################################################
+# type "refresh" to update the shell environment variables with the latest tmux environment variables
+# usage: refresh
+if [ -n "$TMUX" ]; then                                                                               
+  function refresh {                                                                                
+    export $(tmux show-environment | grep "^SSH_AUTH_SOCK")
+    export $(tmux show-environment | grep "^DISPLAY")
+  }                                                                                                 
+else                                                                                                  
+  function refresh { 
+    true 
+  }                                                                              
+fi
+
+###############################################################################################
+# updates source code to a given CL based on mappings present in the QB file used to sync the build
+# usage: qbsync <p4 changelist>
+qbsync()
+{
+  QB=QBLT/qb_config.qb
+  if [ -f $QB ]; then
+    for component in `grep -e "^//source/qcom/qct/modem/" $QB | sed 's/\.\.\..\{0,1\}$/.../'`; do
+      if (( $# == 0 )); then
+        p4 sync -q ${component}
+      else
+        cl=$1
+        p4 sync -q ${component}@${cl}
+      fi
+    done
+  fi
+}
+
+###############################################################################################
+# these scripts sync the latest rf tips on top of the CRM specified in the ALL_TIPS_QB qb file. It creates a p4
+# workspace with name based on <tag>, and puts the sync'd files in this linux machine's 'builds' directory (under a
+# folder name based on <tag>).  Extra qbuild arguments can be anything accepted by QBuild program.  A common example is
+# "-S" which will only sync files without building anything.
+#
+# usage: xxx_sync <tag> <extra qbuild arguments>
+
+cv1-sync() { NAME=$1; shift; echo "\nqbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/CE/CE10_GENTEST_TIPS.qb -r ce_gtest/$NAME -c DPASSMOR_nr5g_ce_$NAME $*"; echo "\nPress enter to continue"; read; qbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/CE/CE10_GENTEST_TIPS.qb -r ce_gtest/$NAME -c DPASSMOR_nr5g_ce_$NAME $*; }
+
+cv2-sync() { NAME=$1; shift; echo "\nqbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/CE/CE20_RMTEFS_TIPS.qb -r cv2/$NAME -c DPASSMOR_nr5g_cv2_$NAME $*"; echo "\nPress enter to continue"; read; qbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/CE/CE20_RMTEFS_TIPS.qb -r cv2/$NAME -c DPASSMOR_nr5g_cv2_$NAME $*; } 
+
+hi-create-rmtefs() { NAME=$1; shift; CMD="qbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/HI/HI10_SDX55_RMTEFS_TIPS.qb -S -r hi/$NAME -c DPASSMOR_nr5g_hi_$NAME $*"; echo "\n$CMD\nPress enter to continue"; read; eval $CMD; } 
+
+hi-create-gen() { NAME=$1; shift; echo "\nqbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/HI/HI10_SDX55_GEN_TEST_TIPS.qb -S -r hi/$NAME -c DPASSMOR_nr5g_hi_$NAME $*"; echo "\nPress enter to continue"; read; qbuild -f /prj/qct/asw/modem_sw_rfa/suiteserver/Projects/QBLT/Targets/ALL_TIPS_QB/HI/HI10_SDX55_GEN_TEST_TIPS.qb -r hi/$NAME -c DPASSMOR_nr5g_hi_$NAME $*; } 
+
+###############################################################################################
+# run from root directory of any CRM/RCI build to add gtest files  
+# 
+cv2-add-gtest()
+{
+  ~/bin/LinuxScripts/CE_CRM_GTest_Remap
+}
+hi-add-gtest()
+{
+  ~/bin/LinuxScripts/HI_CRM_GTest_Remap
+}
+
+###############################################################################################
+# Argument for these scripts is the unique build prefix string of an RCI build...  
+# So if build is:
+#     BF-ENG-CV2_RF_INTF-MPSS.CE.1.0-01013-SDX50M_RMTEFS_TEST-1
+# The arguments should be: 
+#     BF-ENG-CV2_RF_INTF-MPSS.CE.1.0-01013-SDX50M_RMTEFS_TEST-1 -n <build number>
+rci-create()
+{
+  /pkg/qct/software/lteswint/BuildFactory_linux/syncrci -b $*
+}
+
+###############################################################################################
+# Argument for these scripts is the unique build prefix string of an RCI build...  
+# So if build is:
+#     BF-ENG-CV2_RF_INTF-MPSS.CE.1.0-01013-SDX50M_RMTEFS_TEST-1
+# The argument should be: 
+#     CV2_RF_INTF
+
+rci-list()
+{
+  RCIPATH=$(command ls -d /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*);
+  echo RCI Path: $RCIPATH;
+  ls -l /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*;
+}
+
+
+rci-create-2()
+{
+  if [ -n "$2" ]; then
+    RECIPE=$(command ls -vd /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*/$2/bf_build_recipe.yml);
+  else
+    RECIPE=$(command ls -vd /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*/*/bf_build_recipe.yml | tail -1);
+  fi
+  if [ -n "$RECIPE" ]; then
+    echo RCI Recipe: $RECIPE;
+    echo -----------;
+    cat $RECIPE;
+    echo -----------;
+    cp $RECIPE .;
+    if [ -n "$2" ]; then
+      SYNCBF=$(command ls -vd /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*/$2/sync_bf_build.sh);
+    else
+      SYNCBF=$(command ls -vd /prj/qct/asw/lteswint/lteswint_archive/JenkinsBuild/*$1*/*/sync_bf_build.sh | tail -1);
+    fi
+    echo Sync Script: $SYNCBF;
+    cp $SYNCBF .;
+    sh sync_bf_build.sh;
+  else
+    echo RCI folder: No match;
+  fi
+}
+
+rci-sync()
+{
+  ~/bin/LinuxScripts/RCI_Sync $*
+}
+
+# not sure what this does
+#rci-sync-tips()
+#{
+#  RCIP4PATH=$(grep "  - //depot" bf_build_recipe.yml | cut -c 5- | sed 's/\(\@[0-9]*\)//g');
+#  echo $RCIP4PATH;
+#  p4 sync $RCIP4PATH;
+#}
+
+###############################################################################################
+sf()
+{
+  if [ "$#" -ne 1 ]; then
+    echo "Supply string to search for!"; return 1; 
+  fi
+  search=$1
+  include="yml,py,cpp,c,h,cc,S,scons,gscons,api,pl,pm,pyc,sh,bat"
+  exclude=".config,.git,html,node_modules,code_coverage,tags,elf,map,sym"
+  rg_command='rg --threads 24 --column --no-heading --fixed-strings \
+    --ignore-case --no-ignore --hidden --follow -p -g "*.{'$include'}" -g "!{'$exclude'}/*" '
+  files=`eval $rg_command $search | fzf --ansi --multi --reverse \
+    | awk -F ':' '{print "vim \"+call cursor("$2","$3")\" "$1}'`
+  [[ -n "$files" ]] && eval $files
+}
+
+dtf()
+{
+  /usr/bin/git --git-dir=/usr2/dpassmor/.dotfiles-git/ --work-tree=/usr2/dpassmor $*
+}
+
+git-home()
+{
+  /usr/bin/git --git-dir=/usr2/dpassmor/.git-home/ --work-tree=/usr2/dpassmor $*
+}
