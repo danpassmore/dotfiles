@@ -437,7 +437,7 @@ sf()
 
 dtf()
 {
-  /usr/bin/git --git-dir=/usr2/dpassmor/.dotfiles-git/ --work-tree=/usr2/dpassmor $*
+  /usr/bin/git --git-dir=$HOME/.dotfiles-git/ --work-tree=$HOME $*
 }
 
 git-home()
