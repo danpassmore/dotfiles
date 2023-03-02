@@ -1,9 +1,12 @@
 set nocompatible
 
-call plug#begin('~/.local/share/nvim/plugged')
+let data_dir = has('nvim') ? stdpath('data') . '/site' : '~/.vim'
+if empty(glob(data_dir . '/autoload/plug.vim'))
+  silent execute '!curl -fLo '.data_dir.'/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
 
-" let Vundle manage Vundle, required
-"Plug 'VundleVim/Vundle.vim'
+call plug#begin('~/.local/share/nvim/plugged')
 
 " Javascript stuff 
 "Plug 'ternjs/tern_for_vim'
@@ -20,13 +23,6 @@ Plug 'tpope/vim-unimpaired'
 Plug 'itchyny/lightline.vim'
 Plug 'milkypostman/vim-togglelist'
 
-""""Plug 'scrooloose/nerdtree'
-""""Plug 'majutsushi/tagbar'
-""""Plug 'vim-airline/vim-airline'
-
-Plug 'vim-scripts/DoxygenToolkit.vim'
-""""Plug 'mileszs/ack.vim'
-
 Plug 'ngemily/vim-vp4'
 Plug 'nfvs/vim-perforce'
 
@@ -34,17 +30,11 @@ Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
 Plug 'junegunn/fzf.vim'
 
 
-
 " language-server-protocol stuff
 Plug 'prabirshrestha/async.vim'
 Plug 'prabirshrestha/vim-lsp'
 Plug 'prabirshrestha/asyncomplete.vim'
 Plug 'prabirshrestha/asyncomplete-lsp.vim'
-
-""""Plug 'neoclide/coc.nvim', {'branch': 'release'}
-""""Plug 'vim-syntastic/syntastic'
-""""Plug 'w0rp/ale'
-""""Plug 'autozimu/LanguageClient-neovim', { 'branch': 'next', 'do': 'bash install.sh', }
 
 " Initialize plugin system
 call plug#end()
