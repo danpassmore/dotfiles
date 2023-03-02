@@ -2,7 +2,7 @@
 # if colors don't look right, run this command to get valid settings for the machine:
 #                       find /lib/terminfo /usr/share/terminfo -name "*256*"
 # (as shown here https://push.cx/2008/256-color-xterms-in-ubuntu)
-export TERM=tmux-256color
+# export TERM=tmux-256color
 
 alias   builds='if [ -d /local/mnt/workspace/$USER/Builds ];then cd /local/mnt/workspace/$USER/Builds; elif [ -d /local/mnt/workspace/rci ];then cd /local/mnt/workspace/rci; else echo "Builds folder not available"; fi'
 alias   codeblocks='/usr/bin/codeblocks 2>&1 >/dev/null'
